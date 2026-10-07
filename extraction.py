@@ -1,38 +1,43 @@
-from typing import Literal
-from pydantic import BaseModel
 from google import genai
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 
 #Since Gemini is multimodal, it will be able to extract info from the file regardless of what format its in
-OUTLINE_TEXT = """
-Week 3 – Tutorial 1: Mergesort analysis. Attempt Q1–Q5 before class.
-Week 6 – Lab report 1 due Friday 23:59 via NTULearn.
+
+FILE_PATH = "SC2001.pdf"   # replaces OUTLINE_TEXT
+
+PROMPT = """You are extracting a university course schedule.
+From the attached course outline, extract:
+- every lecture, tutorial and lab, one entry per week it occurs
+- every submission/deadline (assignments, reports, quizzes, projects)
+
+Rules:
+- Use teaching week numbers only. Do NOT convert weeks to calendar dates.
+- If the outline gives an actual date for a deadline, put it in explicit_date.
+- If something isn't stated, use null. Never guess.
+- source_quote must be copied exactly from the outline.
 """
 
-#Gemini API call accepts a Pydantic model directly under the response_schema argument. This works better than passing in the schema in the prompt instruction.
-#But the prompt instruction input doesnt work as well, when you pass it in thru the prompt sometime it breaks and the error doesnt get raised until its propcessed later on. 
-#However when you pass it in as a proper schema, everytime you get data back, Pydantic validates it. If something's off, you get a clear error right there.
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))  # reads your GEMINI_API_KEY env var
 
-#Session schema is the schema for the class info -- lectures, tutorials, labs 
-class Session(BaseModel): 
-    module: str
-    kind: Literal["lecture", "tutorial", "lab"]
-    week: int
-    topic: str
-    details: str
+uploaded = client.files.upload(file=FILE_PATH)
 
-#Deadline schema is the schema for the deliverable info -- like assignments, due dates etc etc
-class Deadline(BaseModel):
-    module: str
-    title: str
-    week: int | None
-    explicit_date: str | None
-    due_time: str | None
-    requirements: str
-    source_quote: str
+response = client.models.generate_content(
+    model="gemini-3.5-flash",  
+    contents=[uploaded, PROMPT],
+    config={
+        "response_mime_type": "application/json",
+        "response_schema": Extraction,
+    },
+)
 
-#Wrapper for schemas since Gemini returns ONE object
-class Extraction(BaseModel):
-    sessions: list[Session]
-    deadlines: list[Deadline]
+result: Extraction = response.parsed
 
-
+for s in result.sessions:
+    print(s.week, s.kind, s.topic)
+for d in result.deadlines:
+    print(d.title, d.week, d.due_time)
