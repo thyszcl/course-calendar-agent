@@ -6,6 +6,8 @@ from pydantic import BaseModel, ValidationError
 #Once this is done, code then waits for user to make changes to the .json file and press Enter into the terminal. Once this is done, it saves the info in the .json file.
 #When review() is called, gemini extraction data is passed in as first argument, second argument is file path and third argument is the list of warnings 
 
+#review() is also called in timetable.py -- Same flow -- Info extraction from timetable with gemini --> Into draft file, warning printed, user given time to edit --> Edits are validated and final version dumped into verified file
+
 def review(data: BaseModel, path: str, warnings: list[str] | None = None) -> BaseModel:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)       #Makes file based on file.path
     with open(path, "w", encoding="utf-8") as f:                   #Opens the file for writing
@@ -25,4 +27,5 @@ def review(data: BaseModel, path: str, warnings: list[str] | None = None) -> Bas
 #Under this while loop, when you press Enter, it begins checking the whole checking/validating process within a try/except block. The code in the try block is run if it causes error,
 #the error isnt immediately raised instead it gets handled by the except block. Once the code in the except block is run, it goes back to check loop condition and continues with the loop. 
 #return type(data).model_validate_json(f.read()) exits the loops when all the checks pass, if any errors are raised it doesnt return and it keeps the loop running.
+#review() returns a pydantic object containing edited, checked data
 

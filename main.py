@@ -1,16 +1,19 @@
-from outline import get_outline
+from outline import load_outlines
 from scheduling import build_session_events
-from timetable import get_timetable
-
-TIMETABLE_FILE = "outlines\\Timetable Y2S1.pdf"
-OUTLINE_FILE = "outlines\\SC2001.pdf"
+from timetable import load_timetable
 
 
 def main():
-    timetable = get_timetable(TIMETABLE_FILE)
-    outline = get_outline(OUTLINE_FILE)
+    # just loads verified files: no Gemini, no review pauses
+    timetable = load_timetable()
+    outlines = load_outlines()
 
-    events, flagged = build_session_events(outline.sessions, timetable.slots)
+    # combine sessions from every module into one list
+    sessions = []
+    for outline in outlines:
+        sessions.extend(outline.sessions)
+
+    events, flagged = build_session_events(sessions, timetable.slots)
 
     print(f"\n===== PREVIEW: {len(events)} session events =====")
     for e in sorted(events, key=lambda e: e.start):
@@ -19,7 +22,7 @@ def main():
     if flagged:
         print(f"\n===== FLAGGED: {len(flagged)} (won't be added) =====")
         for s, reason in flagged:
-            print(f"⚠️  {s.module} {s.kind} wk{s.week} – {s.topic}  →  {reason}")
+            print(f"{s.module} {s.kind} wk{s.week} – {s.topic}  →  {reason}")
 
 
 if __name__ == "__main__":
