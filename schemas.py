@@ -1,13 +1,19 @@
 import re
-from typing import Literal
+from typing import Annotated, Literal
  
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, BeforeValidator, field_validator
  
 # Shared vocabulary: BOTH the outline and the timetable must use these exact words,
 # otherwise the join can't match ("TUT" would never equal "tutorial").
 Kind = Literal["lecture", "tutorial", "lab", "seminar"]
 Day = Literal["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
- 
+
+def clean_module(v):
+    if isinstance(v, str):
+        return "".join(v.split()).upper()   #Removes whitespace and capitalizes course code to ensure that outline format matches timetable format
+    return v
+
+ModuleCode = Annotated[str, BeforeValidator(clean_module)]
 
 #Gemini API call accepts a Pydantic model directly under the response_schema argument. This works better than passing in the schema in the prompt instruction.
 #But the prompt instruction input doesnt work as well, when you pass it in thru the prompt sometime it breaks and the error doesnt get raised until its propcessed later on. 
@@ -18,7 +24,7 @@ Day = Literal["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 # ---------- course outline ----------
  
 class Session(BaseModel):
-    module: str
+    module: ModuleCode
     kind: Kind
     week: int | None          # None = outline doesn't say -> gets flagged
     topic: str
