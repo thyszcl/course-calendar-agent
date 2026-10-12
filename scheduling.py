@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from pydantic import BaseModel
 from schemas import Session, TimetableSlot
-
+from schemas import Deadline, Session, TimetableSlot
 # ---- semester config: set these from the academic calendar ----
 SEMESTER_START = date(2026, 8, 10)   #Monday of teaching week 1 -- this is the anchor used to calculate the date of every session, deadline etc
 RECESS_AFTER_WEEK = 7                #recess week comes after teaching week 7 -- factored into date calculations
@@ -16,6 +16,7 @@ class CalendarEvent(BaseModel):     #Pydantic schema for a finished, date confir
     end: datetime
     location: str | None
     description: str
+    all_day: bool = False            # True for deadline reminders: date matters, time doesn't
 
 
 def week_monday(week: int) -> date:                 #find the monday of any teaching week
@@ -114,6 +115,69 @@ def build_session_events(sessions: list[Session], slots: list[TimetableSlot]):
 
     return events, flagged                                              #Returns list of CalendarEvent Objects and the list of the flagged sessions
 
+def all_day_event(title: str, day: date, description: str) -> CalendarEvent:
+    start = datetime.combine(day, time.min)          # midnight of that day
+    return CalendarEvent(
+        title=title,
+        start=start,
+        end=start + timedelta(days=1),               # all-day events end at the NEXT midnight
+        location=None,
+        description=description,
+        all_day=True,
+    )
+
+
+def build_deadline_events(deadlines: list[Deadline]):
+    events: list[CalendarEvent] = []
+    flagged: list[tuple[Deadline, str]] = []
+
+    for d in deadlines:
+        # 1. turn the text fields into real date/time objects (or flag if they can't be read)
+        due_time = None
+        if d.due_time is not None:
+            try:
+                due_time = time.fromisoformat(d.due_time)          # "23:59" -> time(23, 59)
+            except ValueError:
+                flagged.append((d, f"due_time {d.due_time!r} isn't HH:MM"))
+                continue
+
+        due_date = None
+        if d.explicit_date is not None:
+            try:
+                due_date = date.fromisoformat(d.explicit_date)     # "2026-09-18" -> date(2026, 9, 18)
+            except ValueError:
+                flagged.append((d, f"explicit_date {d.explicit_date!r} isn't YYYY-MM-DD"))
+                continue
+
+        # 2. build the description once, used by every case below
+        description = d.requirements
+        if d.due_time:
+            description += f"\n\nDue time: {d.due_time}"
+        description += f'\n\nFrom outline: "{d.source_quote}"'
+
+        # 3. pick the case
+        if due_date and due_time:
+            # exact moment: zero-length event, shows as a marker at the due time
+            due = datetime.combine(due_date, due_time)
+            events.append(CalendarEvent(
+                title=f"📌 DUE: {d.module} {d.title}",
+                start=due,
+                end=due,
+                location=None,
+                description=description,
+            ))
+
+        elif due_date:
+            events.append(all_day_event(f"📌 DUE: {d.module} {d.title}", due_date, description))
+
+        elif d.week is not None:
+            sunday = week_monday(d.week) - timedelta(days=1)       # day before that week's Monday
+            events.append(all_day_event(f"📌 Due this week: {d.module} {d.title}", sunday, description))
+
+        else:
+            flagged.append((d, "no week or date"))
+
+    return events, flagged
 
 '''
 ===================== HOW scheduling.py WORKS (full flow) =====================
