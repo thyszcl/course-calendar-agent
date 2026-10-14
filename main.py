@@ -9,25 +9,30 @@ def main():
     # just loads verified files: no Gemini, no review pauses
     timetable = load_timetable()
     outlines = load_outlines()     #list of extraction objects
+    sessions = []
+    deadlines = []
+    for outline in outlines:
+        sessions.extend(outline.sessions)
+        deadlines.extend(outline.deadlines)
 
-    #combine sessions from every module/outline file into one list
-    sessions = []                           #list of session objects
-    for outline in outlines:                #Each extraction object has one list of session objects and one list of deadline objects           
-        sessions.extend(outline.sessions)   #Each sessions list from the extraction object is taken and added to the sessions list 
-
-    events, flagged = build_session_events(sessions, timetable.slots)   #build_session_events is a function in scheduling.py that takes in a list of verified session objects aand a list of timetable slots and returns a list of CalendarEvent objects and a list of session objects for which CalendarEvent object could not be created due to insufficient info
-    
+    session_events, flagged_sessions = build_session_events(sessions, timetable.slots)
+    deadline_events, flagged_deadlines = build_deadline_events(deadlines)
+    events = session_events + deadline_events
     #Prints a preview of all events
-    print(f"\n===== PREVIEW: {len(events)} session events =====")
-    for e in sorted(events, key=lambda e: e.start):                     
-        print(f"{e.start:%a %d %b %H:%M}-{e.end:%H:%M}  {e.title}  @ {e.location}")
 
-    #Prints all flagged items
-    if flagged:
-        print(f"\n===== FLAGGED: {len(flagged)} (won't be added) =====")
-        for s, reason in flagged:
-            print(f" {s.module} {s.kind} wk{s.week} – {s.topic}  →  {reason}")
+    print(f"\n===== PREVIEW: {len(session_events)} sessions + {len(deadline_events)} deadlines =====")
+    for e in sorted(events, key=lambda e: e.start):
+        if e.all_day:
+            print(f"{e.start:%a %d %b}  (all day)    {e.title}")
+        else:
+            print(f"{e.start:%a %d %b %H:%M}-{e.end:%H:%M}  {e.title}  @ {e.location}")
 
+    if flagged_sessions:
+        print(f"\n===== FLAGGED SESSIONS: {len(flagged_sessions)} (won't be added) =====")
+        for s, reason in flagged_sessions:
+            print(f"⚠️  {s.module} {s.kind} wk{s.week} – {s.topic}  →  {reason}")
 
-if __name__ == "__main__":
-    main()
+    if flagged_deadlines:
+        print(f"\n===== FLAGGED DEADLINES: {len(flagged_deadlines)} (won't be added) =====")
+        for d, reason in flagged_deadlines:
+            print(f"⚠️  {d.module} – {d.title}  →  {reason}")
