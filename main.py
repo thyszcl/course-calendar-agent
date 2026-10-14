@@ -1,6 +1,7 @@
 from outline import load_outlines
 from scheduling import build_session_events
 from timetable import load_timetable
+from scheduling import build_deadline_events, build_session_events
 
 #main.py doesnt reaaly do anything the actuay extraction and reviewing and everything is done in outlines.py/timetable.py/review.py
 #This code just presents info from already verified timetables/outlines in the terminal

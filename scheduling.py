@@ -229,4 +229,3 @@ Every session ends up in exactly one place: events or flagged.
 Unused timetable slots are normal (the outline decides which weeks have classes).
 ================================================================================
 '''
-#fnanejfnajenfkjenfjkswef
